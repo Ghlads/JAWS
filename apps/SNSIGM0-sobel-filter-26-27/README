@@ -23,11 +23,12 @@ image-input/photo.jpg  ->  image-output/sobel-photo.jpg
 
 ## Utilisation
 
-Prerequis : un acces internet et `curl` ou `wget`. Python n'a pas besoin d'etre installe.
-Sous Windows, utiliser WSL ou Git Bash.
+Prerequis : un acces internet et `curl`. Python n'a pas besoin d'etre installe.
+
+Sous Windows, lancer les scripts depuis **Git Bash** (installe avec Git for Windows) ou **WSL**. PowerShell et `cmd` ne sont pas supportes.
 
 ```bash
-./setup.sh   # une seule fois : installe Python et les dependances
+./setup.sh   # une seule fois : installe micromamba, Python et les dependances
 ./run.sh     # applique les filtres
 ```
 
@@ -41,16 +42,31 @@ Sous Windows, utiliser WSL ou Git Bash.
 .
 ├── setup.sh           # installation de l'environnement
 ├── run.sh             # point d'entree
-├── dependencies.yaml  # dependances du projet
+├── environment.yml    # version de Python et dependances du projet
+├── .tools/            # micromamba (genere par setup.sh, ignore par git)
+├── .venv/             # environnement Python (genere par setup.sh, ignore par git)
 ├── image-input/       # images a traiter
 ├── image-output/      # images generees
-└── src/			   # script python
+└── src/               # code Python
 ```
 
 ## Developpement
 
-Les dependances sont gerees avec dependencies.yaml. L'environnement virtuel est cree dans `.venv/` par `setup.sh`.
+Python et les dependances sont geres avec [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html), un binaire telecharge localement dans `.tools/` par `setup.sh`. Rien n'est installe sur le systeme. L'environnement est cree dans `.venv/` a partir de `environment.yml`.
 
 **Ajouter une dependance :**
 
-rajouter la dependance dans dependencies.yaml
+1. Ajouter la dependance dans `environment.yml`, sous `dependencies`
+2. Relancer `./setup.sh` (l'environnement existant est mis a jour)
+
+Pour un paquet disponible uniquement sur PyPI, l'ajouter dans la section `pip` :
+
+```yaml
+dependencies:
+  - python=3.12
+  - numpy
+  - pip:
+      - nom-du-paquet
+```
+
+**Reinitialiser l'environnement :** supprimer `.venv/` (et `.tools/` au besoin) puis relancer `./setup.sh`.
