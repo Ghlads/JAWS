@@ -27,6 +27,7 @@ Chaque projet s'appelle une **app**. Une app est un sous-projet autonome : elle 
 jaws/
 ├── apps/        # Toutes les apps (un dossier par app)
 ├── docs/        # Ressources transverses (fiches, cours, templates)
+├── shared/      # Librairie ou code commun à plusieurs apps
 ├── LICENSE
 └── README.md
 ```
@@ -36,7 +37,7 @@ jaws/
 1. Toutes les apps vivent dans `apps/`, à la racine du repo. Pas de sous-dossier par techno ou par année.
 2. Une app = un dossier = un projet autonome.
 3. Chaque app contient au minimum un `README.md` (objectif, comment la lancer).
-4. Une app ne dépend pas du code d'une autre app. Si du code est partagé, il est copié ou déplacé dans `docs/`.
+4. Une app ne dépend pas du code d'une autre app. Si du code est partagé, il est copié ou déplacé dans `shared/`.
 5. Les fichiers générés (binaires, `Library/` Unity, `venv`, gros datasets) ne sont jamais commit.
 
 ---
