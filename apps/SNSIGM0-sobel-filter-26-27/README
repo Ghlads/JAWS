@@ -1,0 +1,56 @@
+# image-filters
+
+Projet Python qui prend toutes les images du dossier `image-input/`, leur applique des filtres de traitement de signal, puis ecrit les resultats dans `image-output/`.
+
+Chaque fichier de sortie garde le nom original, prefixe par le nom du filtre :
+
+```
+image-input/photo.jpg  ->  image-output/sobel-photo.jpg
+```
+
+## Filtres disponibles
+
+| Filtre  | Description                                  |
+|---------|----------------------------------------------|
+| `sobel` | Detection de contours (magnitude du gradient) |
+
+## Extensions supportees
+
+- `.jpg`
+- `.jpeg`
+
+(La detection est insensible a la casse : `.JPG` fonctionne aussi.)
+
+## Utilisation
+
+Prerequis : un acces internet et `curl` ou `wget`. Python n'a pas besoin d'etre installe.
+Sous Windows, utiliser WSL ou Git Bash.
+
+```bash
+./setup.sh   # une seule fois : installe Python et les dependances
+./run.sh     # applique les filtres
+```
+
+1. Deposer les images dans `image-input/`
+2. Lancer `./run.sh`
+3. Recuperer les resultats dans `image-output/`
+
+## Structure du projet
+
+```
+.
+├── setup.sh           # installation de l'environnement
+├── run.sh             # point d'entree
+├── dependencies.yaml  # dependances du projet
+├── image-input/       # images a traiter
+├── image-output/      # images generees
+└── src/			   # script python
+```
+
+## Developpement
+
+Les dependances sont gerees avec dependencies.yaml. L'environnement virtuel est cree dans `.venv/` par `setup.sh`.
+
+**Ajouter une dependance :**
+
+rajouter la dependance dans dependencies.yaml
