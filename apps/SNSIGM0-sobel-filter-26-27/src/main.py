@@ -2,11 +2,12 @@ from image_manipulation import *
 from pathlib import Path
 from file_utils import is_image_supported
 from config_loader import config
+from filters import black_and_white_filter
 
 
 def process_image(file_path: Path) -> None:
     image: SafeImage = load_image(file_path)
-    
+    black_and_white_filter(image)
     # do filtering things here
     
     output_file_path = config.output_path / file_path.name
