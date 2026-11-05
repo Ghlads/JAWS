@@ -5,11 +5,13 @@ from config_loader import config
 
 
 def process_image(file_path: Path) -> None:
-    image = load_image(file_path)
-    # Here you can apply any image processing operations, e.g., Sobel filter
-    # For demonstration, we will just save the original image to the output directory
+    image: SafeImage = load_image(file_path)
+    
+    # do filtering things here
+    
     output_file_path = config.output_path / file_path.name
     save_image(image, output_file_path)
+    image.release()  # Release the image resource after processing
     pass
 
 
