@@ -5,6 +5,9 @@ class PixelChannels:
     def __init__(self, channel_values: tuple[int, ...]):
         self.raw = channel_values
 
+    def get_first(self) -> int:
+        return self.raw[0]
+
     def has_rgb(self) -> bool:
         return len(self.raw) >= 3
 
