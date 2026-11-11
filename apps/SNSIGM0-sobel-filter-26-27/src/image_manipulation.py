@@ -1,9 +1,12 @@
 from pathlib import Path
-from safe_image import SafeImage
+
 from PIL import Image
+from safe_image import SafeImage
+
 
 def load_image(path: Path) -> SafeImage:
-    return SafeImage(path)
+    return SafeImage(path.name).FromPath(path)
+
 
 def save_image(safe_image: SafeImage, path: Path) -> None:
     path = Path(path)
