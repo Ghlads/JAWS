@@ -1,6 +1,8 @@
-from PIL import Image
-from safe_image import SafeImage, PixelChannels
-from collections.abc import Callable
+from math import sqrt
+
+from kernel_utils import Direction, mean, sample_kernel
+from safe_image import PixelChannels, SafeImage
+
 
 class FilterContext:
     def __init__(self, image: SafeImage):
@@ -8,11 +10,15 @@ class FilterContext:
         self.width, self.height = image.get_image().size
         self.x = 0
         self.y = 0
+        self.target = image
+
+    def set_target_as_copy(self) -> None:
+        self.target = self.image.Copy()
 
     def set_x(self, in_x: int) -> None:
         self.x = in_x
 
-    def set_x(self, in_y: int) -> None:
+    def set_y(self, in_y: int) -> None:
         self.y = in_y
 
     def get_x(self) -> int:
@@ -21,44 +27,145 @@ class FilterContext:
     def get_y(self) -> int:
         return self.y
 
-    def set_xy(self, in_x: int, in_y:int)->None:
+    def get_xy(self) -> (int, int):
+        return (self.x, self.y)
+
+    def set_xy(self, in_x: int, in_y: int) -> None:
         self.x = in_x
         self.y = in_y
 
-    def get_target_pixel(self)-> PixelChannels:
+    def get_target_pixel(self) -> PixelChannels:
         return self.get_pixel(self.x, self.y)
 
     def get_pixel(self, x: int, y: int) -> PixelChannels:
-        return PixelChannels(self.image.get_image().getpixel((x,y)))
+        return PixelChannels(self.target.get_image().getpixel((x, y)))
 
 
+class Filter:
+    def apply(self, image: SafeImage) -> SafeImage:
+        context: FilterContext = self.create_context(image)
+        for x in range(context.width):
+            for y in range(context.height):
+                context.set_xy(x, y)
+                self.compute(context)
 
-def apply_filter(safe_image: SafeImage, filter_func: Callable[[FilterContext], None]) -> None:
-    context: FilterContext = FilterContext(safe_image)
-    for x in range(context.width):
-        for y in range(context.height):
-             context.set_xy(x,y)
-             filter_func(context)
+        if context.image != context.target:
+            context.image.release()
+        return context.target
 
+    def create_context(self, image: SafeImage) -> FilterContext:
+        return FilterContext(image)
 
-
-def black_and_white_filter(context: FilterContext) -> None:
-    pixel: PixelChannels = context.get_target_pixel()
-    if not pixel.has_rgb():
-        return  # Skip pixels that don't have RGB channels
-
-    r, g, b = pixel.get_rgb()
-    gray = int(0.299 * r + 0.587 * g + 0.114 * b)  # luminance formula
-    if pixel.has_alpha():
-        context.image.get_image().putpixel((context.x, context.y), (gray, gray, gray, pixel.get_alpha()))
-    else:
-        context.image.get_image().putpixel((context.x, context.y), (gray, gray, gray))
+    def compute(self, context: FilterContext) -> None:
+        pass
 
 
-sobel_kernel_smooth: int[] = [1,2,1]
-sobel_kernel_derivation: int[] = [-1,0,1]
-def sobel_filter_horizontal(context: FilterContext) -> None:
-    pass
+class BlackAndWhiteFilter(Filter):
+    def compute(self, context: FilterContext) -> None:
+        pixel: PixelChannels = context.get_target_pixel()
+
+        if not pixel.has_rgb():
+            return  # Skip pixels that don't have RGB channels
+
+        r, g, b = pixel.get_rgb()
+        gray = int(0.299 * r + 0.587 * g + 0.114 * b)  # luminance formula
+        if pixel.has_alpha():
+            context.target.get_image().putpixel(
+                context.get_xy(), (gray, gray, gray, pixel.get_alpha())
+            )
+        else:
+            context.target.get_image().putpixel(context.get_xy(), (gray, gray, gray))
 
 
+class KernelDirectionalFilter(Filter):
+    def __init__(self, kernel: list[float], direction: Direction):
+        self.kernel = kernel
+        self.direction = direction
 
+    def create_context(self, image: SafeImage) -> FilterContext:
+        context: FilterContext = FilterContext(image)
+        context.set_target_as_copy()
+        return context
+
+    def compute(self, context: FilterContext) -> None:
+        pixel_mean: int = int(
+            mean(
+                sample_kernel(
+                    context.image, context.get_xy(), self.kernel, self.direction
+                )
+            )
+        )
+        context.target.get_image().putpixel(
+            context.get_xy(), (pixel_mean, pixel_mean, pixel_mean)
+        )
+
+
+class HorizontalKernelFilter(KernelDirectionalFilter):
+    def __init__(self, kernel: list[float]):
+        super().__init__(kernel, Direction.Horizontal)
+
+
+class VerticalKernelFilter(KernelDirectionalFilter):
+    def __init__(self, kernel: list[float]):
+        super().__init__(kernel, Direction.Vertical)
+
+
+class BidirectionalKernelFilter(Filter):
+    def __init__(
+        self,
+        horizontal_filter: HorizontalKernelFilter,
+        vertical_filter: VerticalKernelFilter,
+    ):
+        self.horizontal_filter = horizontal_filter
+        self.vertical_filter = vertical_filter
+
+    def apply(self, image) -> SafeImage:
+        return self.vertical_filter.apply(self.horizontal_filter.apply(image))
+
+
+sobel_kernel_smooth = [1 / 4, 2 / 4, 1 / 4]
+sobel_kernel_derivation = [-1 / 4, 0, 1 / 4]
+
+
+class SobleFilter(Filter):
+
+    def __init__(self):
+        self.first_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
+            HorizontalKernelFilter(sobel_kernel_smooth),
+            VerticalKernelFilter(sobel_kernel_derivation),
+        )
+        self.second_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
+            HorizontalKernelFilter(sobel_kernel_derivation),
+            VerticalKernelFilter(sobel_kernel_smooth),
+        )
+        pass
+
+    def apply(self, image: SafeImage) -> SafeImage:
+        image.lock()
+        result = self.compute_magnitude(
+            self.first_pass.apply(image), self.second_pass.apply(image)
+        )
+        image.unlock()
+        image.release()
+        return result
+
+    def compute_magnitude(self, first: SafeImage, second: SafeImage) -> SafeImage:
+        width: int = first.get_image().width
+        height: int = first.get_image().height
+        merged: SafeImage = first.Copy()
+        for x in range(width):
+            for y in range(height):
+                first_pix: int = PixelChannels(
+                    first.get_image().getpixel((x, y))
+                ).get_first()
+                second_pix: int = PixelChannels(
+                    second.get_image().getpixel((x, y))
+                ).get_first()
+                new_pix: int = int(
+                    sqrt(first_pix * first_pix + second_pix * second_pix)
+                )
+                merged.get_image().putpixel((x, y), (new_pix, new_pix, new_pix))
+
+        first.release()
+        second.release()
+        return merged
