@@ -1,4 +1,5 @@
 from math import sqrt
+from random import gauss, uniform
 
 from kernel_utils import Direction, mean, sample_kernel
 from safe_image import PixelChannels, SafeImage
@@ -169,3 +170,26 @@ class SobleFilter(Filter):
         first.release()
         second.release()
         return merged
+
+
+class GaussianNoiseFilter(Filter):
+    def __init__(self, mean: float, sigma: float) -> None:
+        self.mean = mean
+        self.sigma = sigma
+
+    def create_context(self, image: SafeImage) -> FilterContext:
+        context = super().create_context(image)
+        context.set_target_as_copy()
+        return context
+
+    def compute(self, context: FilterContext) -> None:
+        noise: float = gauss(self.mean, self.sigma)
+        raw_pix: int = context.get_target_pixel().get_first()
+        pix: float = raw_pix + noise
+        if pix > 255:
+            pix = 255
+        elif pix < 0:
+            pix = 0
+
+        pix = int(pix)
+        context.target.get_image().putpixel(context.get_xy(), (pix, pix, pix))
