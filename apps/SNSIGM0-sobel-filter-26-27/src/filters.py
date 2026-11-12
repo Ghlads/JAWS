@@ -124,22 +124,16 @@ class BidirectionalKernelFilter(Filter):
         return self.vertical_filter.apply(self.horizontal_filter.apply(image))
 
 
-sobel_kernel_smooth = [1 / 4, 2 / 4, 1 / 4]
-sobel_kernel_derivation = [-1 / 4, 0, 1 / 4]
-
-
-class SobleFilter(Filter):
-
-    def __init__(self):
+class KernelFilter(Filter):
+    def __init__(self, smooth_kernel: list[int], derivation_kernel: list[int]):
         self.first_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(sobel_kernel_smooth),
-            VerticalKernelFilter(sobel_kernel_derivation),
+            HorizontalKernelFilter(smooth_kernel),
+            VerticalKernelFilter(derivation_kernel),
         )
         self.second_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(sobel_kernel_derivation),
-            VerticalKernelFilter(sobel_kernel_smooth),
+            HorizontalKernelFilter(derivation_kernel),
+            VerticalKernelFilter(smooth_kernel),
         )
-        pass
 
     def apply(self, image: SafeImage) -> SafeImage:
         image.lock()
@@ -170,6 +164,24 @@ class SobleFilter(Filter):
         first.release()
         second.release()
         return merged
+
+
+sobel_kernel_smooth = [1 / 4, 2 / 4, 1 / 4]
+sobel_kernel_derivation = [-1 / 4, 0, 1 / 4]
+
+
+class SobleFilter(KernelFilter):
+    def __init__(self):
+        super().__init__(sobel_kernel_smooth, sobel_kernel_derivation)
+
+
+prewit_kernel_smooth: list[int] = [1, 1, 1]
+prewit_kernel_derivation: list[int] = [-1, 0, 1]
+
+
+class PrewitFilter(KernelFilter):
+    def __init__(self):
+        super().__init__(prewit_kernel_smooth, prewit_kernel_derivation)
 
 
 class GaussianNoiseFilter(Filter):
