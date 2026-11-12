@@ -193,3 +193,25 @@ class GaussianNoiseFilter(Filter):
 
         pix = int(pix)
         context.target.get_image().putpixel(context.get_xy(), (pix, pix, pix))
+
+
+class SaltAndPepperNoiseFilter(Filter):
+    def __init__(self, odds: float):
+        self.odds = odds
+
+    def create_context(self, image: SafeImage) -> FilterContext:
+        context = super().create_context(image)
+        context.set_target_as_copy()
+        return context
+
+    def compute(self, context: FilterContext) -> None:
+        noise: float = uniform(0.0, 1.0)
+        pix: int = 0
+        if noise < (self.odds / 2):
+            pix = 0
+        elif noise < self.odds:
+            pix = 255
+        else:
+            return
+
+        context.target.get_image().putpixel(context.get_xy(), (pix, pix, pix))
