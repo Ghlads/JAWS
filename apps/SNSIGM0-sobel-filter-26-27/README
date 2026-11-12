@@ -18,6 +18,7 @@ image-input/photo.jpg  ->  image-output/sobel-photo.jpg
 
 - `.jpg`
 - `.jpeg`
+- `.png`
 
 (La detection est insensible a la casse : `.JPG` fonctionne aussi.)
 
