@@ -3,6 +3,7 @@ from random import gauss, uniform
 
 from kernel_utils import Direction, mean, sample_kernel
 from safe_image import PixelChannels, SafeImage
+from throttler import set_label, update
 
 
 class FilterContext:
@@ -43,12 +44,17 @@ class FilterContext:
 
 
 class Filter:
+    def __init__(self, filter_name: str):
+        self.name = filter_name
+
     def apply(self, image: SafeImage) -> SafeImage:
         context: FilterContext = self.create_context(image)
+        set_label("{name} : {image}".format(name=self.name, image=context.image.name))
         for x in range(context.width):
             for y in range(context.height):
                 context.set_xy(x, y)
                 self.compute(context)
+                update()
 
         if context.image != context.target:
             context.image.release()
@@ -62,9 +68,11 @@ class Filter:
 
 
 class BlackAndWhiteFilter(Filter):
+    def __init__(self):
+        super().__init__("Black and White")
+
     def compute(self, context: FilterContext) -> None:
         pixel: PixelChannels = context.get_target_pixel()
-
         if not pixel.has_rgb():
             return  # Skip pixels that don't have RGB channels
 
@@ -79,7 +87,8 @@ class BlackAndWhiteFilter(Filter):
 
 
 class KernelDirectionalFilter(Filter):
-    def __init__(self, kernel: list[float], direction: Direction):
+    def __init__(self, kernel: list[float], direction: Direction, filter_name: str):
+        super().__init__(filter_name)
         self.kernel = kernel
         self.direction = direction
 
@@ -102,13 +111,13 @@ class KernelDirectionalFilter(Filter):
 
 
 class HorizontalKernelFilter(KernelDirectionalFilter):
-    def __init__(self, kernel: list[float]):
-        super().__init__(kernel, Direction.Horizontal)
+    def __init__(self, kernel: list[float], filter_name: str):
+        super().__init__(kernel, Direction.Horizontal, filter_name)
 
 
 class VerticalKernelFilter(KernelDirectionalFilter):
-    def __init__(self, kernel: list[float]):
-        super().__init__(kernel, Direction.Vertical)
+    def __init__(self, kernel: list[float], filter_name: str):
+        super().__init__(kernel, Direction.Vertical, filter_name)
 
 
 class BidirectionalKernelFilter(Filter):
@@ -117,6 +126,7 @@ class BidirectionalKernelFilter(Filter):
         horizontal_filter: HorizontalKernelFilter,
         vertical_filter: VerticalKernelFilter,
     ):
+        super().__init__("BidirectionalKernelFilter")
         self.horizontal_filter = horizontal_filter
         self.vertical_filter = vertical_filter
 
@@ -125,14 +135,24 @@ class BidirectionalKernelFilter(Filter):
 
 
 class KernelFilter(Filter):
-    def __init__(self, smooth_kernel: list[int], derivation_kernel: list[int]):
+    def __init__(
+        self, smooth_kernel: list[int], derivation_kernel: list[int], filter_name: str
+    ):
         self.first_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(smooth_kernel),
-            VerticalKernelFilter(derivation_kernel),
+            HorizontalKernelFilter(
+                smooth_kernel, "First_{name}_Horizontal".format(name=filter_name)
+            ),
+            VerticalKernelFilter(
+                derivation_kernel, "First_{name}_Vertical".format(name=filter_name)
+            ),
         )
         self.second_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(derivation_kernel),
-            VerticalKernelFilter(smooth_kernel),
+            HorizontalKernelFilter(
+                derivation_kernel, "Second_{name}_Horizontal".format(name=filter_name)
+            ),
+            VerticalKernelFilter(
+                smooth_kernel, "Second_{name}_Vertical".format(name=filter_name)
+            ),
         )
 
     def apply(self, image: SafeImage) -> SafeImage:
@@ -172,7 +192,7 @@ sobel_kernel_derivation = [-1, 0, 1]
 
 class SobleFilter(KernelFilter):
     def __init__(self):
-        super().__init__(sobel_kernel_smooth, sobel_kernel_derivation)
+        super().__init__(sobel_kernel_smooth, sobel_kernel_derivation, "Sobel")
 
 
 prewit_kernel_smooth: list[int] = [1, 1, 1]
@@ -181,7 +201,7 @@ prewit_kernel_derivation: list[int] = [-1, 0, 1]
 
 class PrewitFilter(KernelFilter):
     def __init__(self):
-        super().__init__(prewit_kernel_smooth, prewit_kernel_derivation)
+        super().__init__(prewit_kernel_smooth, prewit_kernel_derivation, "Prewit")
 
 
 em_kernel_derivation: list[int] = [1, -2, 0, 2, -1]
@@ -190,11 +210,12 @@ em_kernel_smooth: list[int] = [1, 2, 3, 2, 1]
 
 class EMFilter(KernelFilter):
     def __init__(self):
-        super().__init__(em_kernel_smooth, em_kernel_derivation)
+        super().__init__(em_kernel_smooth, em_kernel_derivation, "Em")
 
 
 class GaussianNoiseFilter(Filter):
     def __init__(self, mean: float, sigma: float) -> None:
+        super().__init__("GaussianNoise")
         self.mean = mean
         self.sigma = sigma
 
@@ -218,6 +239,7 @@ class GaussianNoiseFilter(Filter):
 
 class SaltAndPepperNoiseFilter(Filter):
     def __init__(self, odds: float):
+        super().__init__("SaltAndPepperNoise")
         self.odds = odds
 
     def create_context(self, image: SafeImage) -> FilterContext:
@@ -240,6 +262,7 @@ class SaltAndPepperNoiseFilter(Filter):
 
 class ThresholdFilter(Filter):
     def __init__(self, threshold: int):
+        super().__init__("Threshold")
         self.threshold = threshold
 
     def compute(self, context: FilterContext) -> None:
