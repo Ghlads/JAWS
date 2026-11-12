@@ -166,8 +166,8 @@ class KernelFilter(Filter):
         return merged
 
 
-sobel_kernel_smooth = [1 / 4, 2 / 4, 1 / 4]
-sobel_kernel_derivation = [-1 / 4, 0, 1 / 4]
+sobel_kernel_smooth = [1, 2, 1]
+sobel_kernel_derivation = [-1, 0, 1]
 
 
 class SobleFilter(KernelFilter):
@@ -182,6 +182,15 @@ prewit_kernel_derivation: list[int] = [-1, 0, 1]
 class PrewitFilter(KernelFilter):
     def __init__(self):
         super().__init__(prewit_kernel_smooth, prewit_kernel_derivation)
+
+
+em_kernel_derivation: list[int] = [1, -2, 0, 2, -1]
+em_kernel_smooth: list[int] = [1, 2, 3, 2, 1]
+
+
+class EMFilter(KernelFilter):
+    def __init__(self):
+        super().__init__(em_kernel_smooth, em_kernel_derivation)
 
 
 class GaussianNoiseFilter(Filter):
