@@ -4,6 +4,7 @@ from config_loader import config
 from file_utils import is_image_supported
 from filters import *
 from image_manipulation import load_image, save_image
+from throttler import done
 
 
 def process_image(file_path: Path) -> None:
@@ -21,4 +22,5 @@ for element in config.input_path.iterdir():
     if is_image_supported(element):
         process_image(element)
 
-input("Processing complete. Press Enter to exit...")
+done("Processing complete")
+input("Press Enter to exit...")
