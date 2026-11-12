@@ -227,3 +227,13 @@ class SaltAndPepperNoiseFilter(Filter):
             return
 
         context.target.get_image().putpixel(context.get_xy(), (pix, pix, pix))
+
+
+class ThresholdFilter(Filter):
+    def __init__(self, threshold: int):
+        self.threshold = threshold
+
+    def compute(self, context: FilterContext) -> None:
+        pix: int = context.get_target_pixel().get_first()
+        pix = 255 if pix >= self.threshold else 0
+        context.target.get_image().putpixel(context.get_xy(), (pix, pix, pix))
