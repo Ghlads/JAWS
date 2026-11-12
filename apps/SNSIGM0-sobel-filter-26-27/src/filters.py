@@ -156,12 +156,15 @@ class KernelFilter(Filter):
         )
 
     def apply(self, image: SafeImage) -> SafeImage:
+        has_lock = not image.is_locked
         image.lock()
         result = self.compute_magnitude(
             self.first_pass.apply(image), self.second_pass.apply(image)
         )
-        image.unlock()
-        image.release()
+        if has_lock:
+            image.unlock()
+            image.release()
+
         return result
 
     def compute_magnitude(self, first: SafeImage, second: SafeImage) -> SafeImage:
