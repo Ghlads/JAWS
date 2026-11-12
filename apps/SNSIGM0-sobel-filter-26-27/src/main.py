@@ -11,6 +11,7 @@ def process_image(file_path: Path) -> None:
     image = BlackAndWhiteFilter().apply(image)
     # do filtering things here
     image = SobleFilter().apply(image)
+    ThresholdFilter(1).apply(image)
     output_file_path = config.output_path / file_path.name
     save_image(image, output_file_path)
     image.release()  # Release the image resource after processing
