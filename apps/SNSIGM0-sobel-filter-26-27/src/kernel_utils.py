@@ -1,6 +1,7 @@
 from enum import Enum
 from math import floor
 
+from image_manipulation import remap_pixel_to_float
 from safe_image import PixelChannels, SafeImage
 
 
@@ -40,9 +41,10 @@ def sample_kernel(
         if not is_pos_in_image(image, sample_pos):
             continue
 
-        result.append(
-            PixelChannels(image.get_image().getpixel(sample_pos)).get_first() * weight
+        pixel: float = remap_pixel_to_float(
+            PixelChannels(image.get_image().getpixel(sample_pos)).get_first()
         )
+        result.append(pixel * weight)
 
     return result
 
@@ -54,3 +56,11 @@ def mean(samples: list[float]) -> float:
         mean += sample
 
     return mean / size
+
+
+def scalar_multiplication_kernel(kernel: list[float], scalar: float) -> list[float]:
+    result: list[float] = []
+    for elem in kernel:
+        result.append(elem * scalar)
+
+    return result

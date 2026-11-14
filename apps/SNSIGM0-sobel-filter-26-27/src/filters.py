@@ -1,7 +1,8 @@
 from math import sqrt
 from random import gauss, uniform
 
-from kernel_utils import Direction, mean, sample_kernel
+from image_manipulation import remap_pixel_to_int
+from kernel_utils import Direction, mean, sample_kernel, scalar_multiplication_kernel
 from safe_image import PixelChannels, SafeImage
 from throttler import set_label, update
 
@@ -98,7 +99,7 @@ class KernelDirectionalFilter(Filter):
         return context
 
     def compute(self, context: FilterContext) -> None:
-        pixel_mean: int = int(
+        pixel_mean: int = remap_pixel_to_int(
             mean(
                 sample_kernel(
                     context.image, context.get_xy(), self.kernel, self.direction
@@ -189,31 +190,58 @@ class KernelFilter(Filter):
         return merged
 
 
-sobel_kernel_smooth = [1, 2, 1]
-sobel_kernel_derivation = [-1, 0, 1]
+_sobel_kernel_smooth: list[int] = [1, 2, 1]
+_sobel_kernel_derivation: list[int] = [-1, 0, 1]
+_sobel_scalar: float = 1 / 1
+
+
+def sobel_kernel_smooth() -> list[float]:
+    return scalar_multiplication_kernel(_sobel_kernel_smooth, _sobel_scalar)
+
+
+def sobel_kernel_derivation() -> list[float]:
+    return scalar_multiplication_kernel(_sobel_kernel_derivation, _sobel_scalar)
 
 
 class SobleFilter(KernelFilter):
     def __init__(self):
-        super().__init__(sobel_kernel_smooth, sobel_kernel_derivation, "Sobel")
+        super().__init__(sobel_kernel_smooth(), sobel_kernel_derivation(), "Sobel")
 
 
-prewit_kernel_smooth: list[int] = [1, 1, 1]
-prewit_kernel_derivation: list[int] = [-1, 0, 1]
+_prewit_kernel_smooth: list[int] = [1, 1, 1]
+_prewit_kernel_derivation: list[int] = [-1, 0, 1]
+_prewit_scalar: float = 1 / 1
+
+
+def prewit_kernel_smooth() -> list[float]:
+    return scalar_multiplication_kernel(_prewit_kernel_smooth, _prewit_scalar)
+
+
+def prewit_kernel_derivation() -> list[float]:
+    return scalar_multiplication_kernel(_prewit_kernel_derivation, _prewit_scalar)
 
 
 class PrewitFilter(KernelFilter):
     def __init__(self):
-        super().__init__(prewit_kernel_smooth, prewit_kernel_derivation, "Prewit")
+        super().__init__(prewit_kernel_smooth(), prewit_kernel_derivation(), "Prewit")
 
 
-em_kernel_derivation: list[int] = [1, -2, 0, 2, -1]
-em_kernel_smooth: list[int] = [1, 2, 3, 2, 1]
+_em_kernel_derivation: list[int] = [1, -2, 0, 2, -1]
+_em_kernel_smooth: list[int] = [1, 2, 3, 2, 1]
+_em_scalar: float = 1 / 1
+
+
+def em_kernel_smooth() -> list[float]:
+    return scalar_multiplication_kernel(_em_kernel_smooth, _em_scalar)
+
+
+def em_kernel_derivation() -> list[float]:
+    return scalar_multiplication_kernel(_em_kernel_derivation, _em_scalar)
 
 
 class EMFilter(KernelFilter):
     def __init__(self):
-        super().__init__(em_kernel_smooth, em_kernel_derivation, "Em")
+        super().__init__(em_kernel_smooth(), em_kernel_derivation(), "Em")
 
 
 class GaussianNoiseFilter(Filter):
