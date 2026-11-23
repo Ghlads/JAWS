@@ -1,7 +1,7 @@
 from math import sqrt
 from random import gauss, uniform
 
-from kernel_utils import Direction, mean, sample_kernel
+from kernel_utils import Direction, convolve_1d
 from safe_image import PixelChannels, SafeImage
 from throttler import set_label, update
 
@@ -49,7 +49,7 @@ class Filter:
 
     def apply(self, image: SafeImage) -> SafeImage:
         context: FilterContext = self.create_context(image)
-        set_label("{name} : {image}".format(name=self.name, image=context.image.name))
+        set_label(f"{self.name} : {context.image.name}")
         for x in range(context.width):
             for y in range(context.height):
                 context.set_xy(x, y)
@@ -86,134 +86,96 @@ class BlackAndWhiteFilter(Filter):
             context.target.get_image().putpixel(context.get_xy(), (gray, gray, gray))
 
 
-class KernelDirectionalFilter(Filter):
-    def __init__(self, kernel: list[float], direction: Direction, filter_name: str):
-        super().__init__(filter_name)
-        self.kernel = kernel
-        self.direction = direction
+class KernelFilter(Filter):
+    """Filtre de contours separable : G = scalar * (lissage ⊗ derivee).
 
-    def create_context(self, image: SafeImage) -> FilterContext:
-        context: FilterContext = FilterContext(image)
-        context.set_target_as_copy()
-        return context
+    Les calculs intermediaires sont faits en flottants pour garder les
+    valeurs negatives et superieures a 255 ; on ne revient en 8 bits
+    qu'a la fin, apres le calcul de la magnitude.
+    """
 
-    def compute(self, context: FilterContext) -> None:
-        pixel_mean: int = int(
-            mean(
-                sample_kernel(
-                    context.image, context.get_xy(), self.kernel, self.direction
-                )
-            )
-        )
-        context.target.get_image().putpixel(
-            context.get_xy(), (pixel_mean, pixel_mean, pixel_mean)
-        )
-
-
-class HorizontalKernelFilter(KernelDirectionalFilter):
-    def __init__(self, kernel: list[float], filter_name: str):
-        super().__init__(kernel, Direction.Horizontal, filter_name)
-
-
-class VerticalKernelFilter(KernelDirectionalFilter):
-    def __init__(self, kernel: list[float], filter_name: str):
-        super().__init__(kernel, Direction.Vertical, filter_name)
-
-
-class BidirectionalKernelFilter(Filter):
     def __init__(
         self,
-        horizontal_filter: HorizontalKernelFilter,
-        vertical_filter: VerticalKernelFilter,
+        smooth_kernel: list[int],
+        derivation_kernel: list[int],
+        scalar: float,
+        filter_name: str,
     ):
-        super().__init__("BidirectionalKernelFilter")
-        self.horizontal_filter = horizontal_filter
-        self.vertical_filter = vertical_filter
-
-    def apply(self, image) -> SafeImage:
-        return self.vertical_filter.apply(self.horizontal_filter.apply(image))
-
-
-class KernelFilter(Filter):
-    def __init__(
-        self, smooth_kernel: list[int], derivation_kernel: list[int], filter_name: str
-    ):
-        self.first_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(
-                smooth_kernel, "First_{name}_Horizontal".format(name=filter_name)
-            ),
-            VerticalKernelFilter(
-                derivation_kernel, "First_{name}_Vertical".format(name=filter_name)
-            ),
-        )
-        self.second_pass: BidirectionalKernelFilter = BidirectionalKernelFilter(
-            HorizontalKernelFilter(
-                derivation_kernel, "Second_{name}_Horizontal".format(name=filter_name)
-            ),
-            VerticalKernelFilter(
-                smooth_kernel, "Second_{name}_Vertical".format(name=filter_name)
-            ),
-        )
+        super().__init__(filter_name)
+        self.smooth = smooth_kernel
+        self.deriv = derivation_kernel
+        self.scalar = scalar
 
     def apply(self, image: SafeImage) -> SafeImage:
-        has_lock = not image.is_locked
-        image.lock()
-        result = self.compute_magnitude(
-            self.first_pass.apply(image), self.second_pass.apply(image)
+        set_label(f"{self.name} : {image.name}")
+        img = image.get_image()
+        width, height = img.size
+        gray: list[list[float]] = [
+            [float(PixelChannels(img.getpixel((x, y))).get_first()) for x in range(width)]
+            for y in range(height)
+        ]
+
+        # Gx : lissage vertical puis derivee horizontale
+        gx = convolve_1d(
+            convolve_1d(gray, self.smooth, Direction.Vertical, update),
+            self.deriv,
+            Direction.Horizontal,
+            update,
         )
-        if has_lock:
-            image.unlock()
-            image.release()
+        # Gy : lissage horizontal puis derivee verticale
+        gy = convolve_1d(
+            convolve_1d(gray, self.smooth, Direction.Horizontal, update),
+            self.deriv,
+            Direction.Vertical,
+            update,
+        )
 
+        result: SafeImage = image.Copy(f"{self.name}_{image.name}")
+        out = result.get_image()
+        for y in range(height):
+            for x in range(width):
+                # le coefficient de normalisation est applique UNE seule fois
+                mag = self.scalar * sqrt(gx[y][x] ** 2 + gy[y][x] ** 2)
+                pix = min(255, int(mag))
+                out.putpixel((x, y), (pix, pix, pix))
+            update()
+
+        image.release()  # sans effet si l'image est verrouillee
         return result
-
-    def compute_magnitude(self, first: SafeImage, second: SafeImage) -> SafeImage:
-        width: int = first.get_image().width
-        height: int = first.get_image().height
-        merged: SafeImage = first.Copy()
-        for x in range(width):
-            for y in range(height):
-                first_pix: int = PixelChannels(
-                    first.get_image().getpixel((x, y))
-                ).get_first()
-                second_pix: int = PixelChannels(
-                    second.get_image().getpixel((x, y))
-                ).get_first()
-                new_pix: int = int(
-                    sqrt(first_pix * first_pix + second_pix * second_pix)
-                )
-                merged.get_image().putpixel((x, y), (new_pix, new_pix, new_pix))
-
-        first.release()
-        second.release()
-        return merged
 
 
 sobel_kernel_smooth = [1, 2, 1]
 sobel_kernel_derivation = [-1, 0, 1]
+sobel_scalar = 1 / 4
 
 
 class SobleFilter(KernelFilter):
     def __init__(self):
-        super().__init__(sobel_kernel_smooth, sobel_kernel_derivation, "Sobel")
+        super().__init__(
+            sobel_kernel_smooth, sobel_kernel_derivation, sobel_scalar, "Sobel"
+        )
 
 
 prewit_kernel_smooth: list[int] = [1, 1, 1]
 prewit_kernel_derivation: list[int] = [-1, 0, 1]
+prewit_scalar = 1 / 3
 
 
 class PrewitFilter(KernelFilter):
     def __init__(self):
-        super().__init__(prewit_kernel_smooth, prewit_kernel_derivation, "Prewit")
+        super().__init__(
+            prewit_kernel_smooth, prewit_kernel_derivation, prewit_scalar, "Prewit"
+        )
 
 
 em_kernel_derivation: list[int] = [1, -2, 0, 2, -1]
 em_kernel_smooth: list[int] = [1, 2, 3, 2, 1]
+em_scalar = 1 / 18
 
 
 class EMFilter(KernelFilter):
     def __init__(self):
-        super().__init__(em_kernel_smooth, em_kernel_derivation, "Em")
+        super().__init__(em_kernel_smooth, em_kernel_derivation, em_scalar, "Em")
 
 
 class GaussianNoiseFilter(Filter):

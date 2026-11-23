@@ -54,3 +54,32 @@ def mean(samples: list[float]) -> float:
         mean += sample
 
     return mean / size
+
+
+def convolve_1d(
+    grid: list[list[float]],
+    kernel: list[int],
+    direction: Direction,
+    on_row=None,
+) -> list[list[float]]:
+    """Applique un noyau 1D sur une grille de flottants grid[y][x].
+
+    Somme ponderee (pas de moyenne), aucune troncature ni clamp :
+    les valeurs negatives sont conservees. Aux bords, on repete le
+    pixel le plus proche.
+    """
+    height, width = len(grid), len(grid[0])
+    half = len(kernel) // 2
+    out: list[list[float]] = [[0.0] * width for _ in range(height)]
+    for y in range(height):
+        for x in range(width):
+            acc = 0.0
+            for index, weight in enumerate(kernel):
+                sx, sy = offset_pos((x, y), index - half, direction)
+                sx = min(max(sx, 0), width - 1)
+                sy = min(max(sy, 0), height - 1)
+                acc += grid[sy][sx] * weight
+            out[y][x] = acc
+        if on_row is not None:
+            on_row()
+    return out
