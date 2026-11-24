@@ -95,7 +95,7 @@ class KernelFilter(Filter):
 sobel_kernel_smooth: list[float] = [1, 2, 1]
 sobel_kernel_derivation: list[float] = [-1, 0, 1]
 sobel_scalar = 1 / 4
-sobel_threshold: float | None = 50  # None = pas de seuil
+sobel_threshold: float | None = 30  # None = pas de seuil
 
 
 class SobelFilter(KernelFilter):
@@ -113,7 +113,7 @@ class SobelFilter(KernelFilter):
 prewit_kernel_smooth: list[float] = [1, 1, 1]
 prewit_kernel_derivation: list[float] = [-1, 0, 1]
 prewit_scalar = 1 / 3
-prewit_threshold: float | None = 50  # None = pas de seuil
+prewit_threshold: float | None = 30  # None = pas de seuil
 
 
 class PrewitFilter(KernelFilter):
@@ -131,7 +131,7 @@ class PrewitFilter(KernelFilter):
 em_kernel_smooth: list[float] = [1, 2, 3, 2, 1]
 em_kernel_derivation: list[float] = [1, -2, 0, 2, -1]
 em_scalar = 1 / 18
-em_threshold: float | None = 50  # None = pas de seuil
+em_threshold: float | None = 30  # None = pas de seuil
 
 
 class EMFilter(KernelFilter):
